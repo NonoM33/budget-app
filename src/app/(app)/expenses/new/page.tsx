@@ -116,7 +116,7 @@ export default function NewExpensePage() {
                 }`}
                 style={
                   categoryId === cat.id
-                    ? { ringColor: cat.color }
+                    ? { borderColor: cat.color, borderWidth: 2 }
                     : undefined
                 }
               >
