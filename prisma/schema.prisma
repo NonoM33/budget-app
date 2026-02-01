@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique
+  password          String
+  avatar            String?
+  expenses          Expense[]
+  budgets           Budget[]
+  wishlistItems     WishlistItem[]
+  recurringExpenses RecurringExpense[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Category {
+  id                String             @id @default(cuid())
+  name              String             @unique
+  icon              String
+  color             String
+  order             Int                @default(0)
+  expenses          Expense[]
+  budgets           Budget[]
+  recurringExpenses RecurringExpense[]
+}
+
+model Expense {
+  id                 String            @id @default(cuid())
+  amount             Float
+  description        String
+  date               DateTime
+  shared             Boolean           @default(false)
+  categoryId         String
+  category           Category          @relation(fields: [categoryId], references: [id])
+  userId             String
+  user               User              @relation(fields: [userId], references: [id])
+  recurringExpenseId String?
+  recurringExpense   RecurringExpense? @relation(fields: [recurringExpenseId], references: [id])
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([date])
+}
+
+model RecurringExpense {
+  id          String    @id @default(cuid())
+  amount      Float
+  description String
+  frequency   String    // monthly, weekly, yearly
+  nextDate    DateTime
+  active      Boolean   @default(true)
+  shared      Boolean   @default(false)
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  expenses    Expense[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([active])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  amount     Float
+  month      Int
+  year       Int
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, userId, month, year])
+  @@index([userId])
+  @@index([month, year])
+}
+
+model WishlistItem {
+  id          String    @id @default(cuid())
+  name        String
+  price       Float?
+  url         String?
+  imageUrl    String?
+  priority    Int       @default(3)
+  purchased   Boolean   @default(false)
+  purchasedAt DateTime?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+}
