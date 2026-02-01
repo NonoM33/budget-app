@@ -1,10 +1,12 @@
 #!/bin/sh
 set -e
 
-echo "🔄 Running database migrations..."
-npx prisma db push --skip-generate 2>&1 || echo "⚠️  Migration issue (non-blocking)"
+PRISMA_BIN="./node_modules/prisma/build/index.js"
 
-# Seed on first run (check if users exist)
+echo "🔄 Running database migrations..."
+node $PRISMA_BIN db push --skip-generate 2>&1 || echo "⚠️  Migration issue"
+
+# Seed on first run
 echo "🌱 Checking if seed is needed..."
 NEEDS_SEED=$(node -e "
 const { PrismaClient } = require('@prisma/client');
