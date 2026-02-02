@@ -1,13 +1,10 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { authenticateRequest } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+export async function GET(request: NextRequest) {
+  const auth = await authenticateRequest(request);
+  if (!auth.authenticated) return auth.error!;
 
   try {
     const categories = await prisma.category.findMany({
@@ -16,9 +13,6 @@ export async function GET() {
     return NextResponse.json(categories);
   } catch (error) {
     console.error("Failed to fetch categories:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

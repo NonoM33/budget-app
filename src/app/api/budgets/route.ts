@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+  const auth = await authenticateRequest(request);
+  if (!auth.authenticated) return auth.error!;
 
   const { searchParams } = new URL(request.url);
   const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
@@ -26,50 +23,38 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(budgets);
   } catch (error) {
     console.error("Failed to fetch budgets:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+  const auth = await authenticateRequest(request);
+  if (!auth.authenticated) return auth.error!;
 
   try {
     const body = await request.json();
     const { amount, categoryId, month, year } = body;
 
     if (amount === undefined || !categoryId || !month || !year) {
-      return NextResponse.json(
-        { error: "Champs requis manquants" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
     }
-
-    const userId = (session.user as { id: string }).id;
 
     const budget = await prisma.budget.upsert({
       where: {
         categoryId_userId_month_year: {
           categoryId,
-          userId,
+          userId: auth.userId!,
           month,
           year,
         },
       },
-      update: {
-        amount: parseFloat(amount),
-      },
+      update: { amount: parseFloat(amount) },
       create: {
         amount: parseFloat(amount),
         categoryId,
         month,
         year,
-        userId,
+        userId: auth.userId!,
       },
       include: {
         category: true,
@@ -80,9 +65,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(budget);
   } catch (error) {
     console.error("Failed to upsert budget:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

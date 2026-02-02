@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+  const auth = await authenticateRequest(request);
+  if (!auth.authenticated) return auth.error!;
 
   const { searchParams } = new URL(request.url);
   const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
@@ -19,15 +16,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const where: Record<string, unknown> = {
-      date: {
-        gte: startDate,
-        lt: endDate,
-      },
+      date: { gte: startDate, lt: endDate },
     };
-
-    if (categoryId) {
-      where.categoryId = categoryId;
-    }
+    if (categoryId) where.categoryId = categoryId;
 
     const expenses = await prisma.expense.findMany({
       where,
@@ -41,28 +32,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(expenses);
   } catch (error) {
     console.error("Failed to fetch expenses:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
+  const auth = await authenticateRequest(request);
+  if (!auth.authenticated) return auth.error!;
 
   try {
     const body = await request.json();
     const { amount, description, categoryId, date, shared } = body;
 
     if (!amount || !categoryId) {
-      return NextResponse.json(
-        { error: "Montant et catégorie requis" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Montant et catégorie requis" }, { status: 400 });
     }
 
     const expense = await prisma.expense.create({
@@ -72,7 +55,7 @@ export async function POST(request: NextRequest) {
         categoryId,
         date: new Date(date || new Date()),
         shared: shared || false,
-        userId: (session.user as { id: string }).id,
+        userId: auth.userId!,
       },
       include: {
         category: true,
@@ -83,9 +66,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(expense, { status: 201 });
   } catch (error) {
     console.error("Failed to create expense:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
